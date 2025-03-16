@@ -1,8 +1,9 @@
-.PHONY: all build test clean lint install-tools tidy bench cover vet fmt check
+.PHONY: all build test clean lint install-tools tidy bench cover vet fmt check gosec
 
 GOPATH := $(shell go env GOPATH)
 BIN_DIR := $(GOPATH)/bin
 GOLANGCI_LINT := $(BIN_DIR)/golangci-lint
+GOSEC := $(BIN_DIR)/gosec
 
 all: test build
 
@@ -23,11 +24,19 @@ $(GOLANGCI_LINT):
 	@echo "Installing golangci-lint..."
 	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
+$(GOSEC):
+	@echo "Installing gosec..."
+	@go install github.com/securego/gosec/v2/cmd/gosec@latest
+
 lint: $(GOLANGCI_LINT)
 	@echo "Running linter..."
 	@$(GOLANGCI_LINT) run --timeout=5m
 
-install-tools: $(GOLANGCI_LINT)
+gosec: $(GOSEC)
+	@echo "Running security scanner..."
+	@$(GOSEC) -exclude-dir=.github -exclude-dir=examples ./...
+
+install-tools: $(GOLANGCI_LINT) $(GOSEC)
 	@echo "All tools installed"
 
 tidy:
@@ -51,5 +60,5 @@ fmt:
 	@echo "Running go fmt..."
 	@go fmt ./...
 
-check: fmt vet lint test
+check: fmt vet lint gosec test
 	@echo "All checks passed!"
