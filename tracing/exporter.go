@@ -102,7 +102,7 @@ func NewOpenAIExporter(options OpenAIExporterOptions) (*OpenAIExporter, error) {
 
 	// Create backup directory if specified
 	if options.BackupDir != "" {
-		if err := os.MkdirAll(options.BackupDir, 0755); err != nil {
+		if err := os.MkdirAll(options.BackupDir, 0750); err != nil {
 			return nil, fmt.Errorf("failed to create backup directory: %w", err)
 		}
 	}
@@ -209,7 +209,7 @@ func (e *OpenAIExporter) saveToBackup(spans []*StandardSpan) error {
 	}
 
 	// Write to file
-	err = os.WriteFile(filepath, jsonData, 0644)
+	err = os.WriteFile(filepath, jsonData, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to write backup file: %w", err)
 	}
