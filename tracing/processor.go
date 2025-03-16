@@ -221,7 +221,7 @@ func (p *BatchSpanProcessor) saveSpanToBackup(span *StandardSpan) error {
 	}
 
 	// Ensure the backup directory exists
-	if err := os.MkdirAll(p.options.BackupDir, 0755); err != nil {
+	if err := os.MkdirAll(p.options.BackupDir, 0750); err != nil {
 		return fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
@@ -237,7 +237,7 @@ func (p *BatchSpanProcessor) saveSpanToBackup(span *StandardSpan) error {
 	}
 
 	// Write to file
-	if err := os.WriteFile(filepath, spanJSON, 0644); err != nil {
+	if err := os.WriteFile(filepath, spanJSON, 0600); err != nil {
 		return fmt.Errorf("failed to write backup file: %w", err)
 	}
 
@@ -291,18 +291,17 @@ func (p *BatchSpanProcessor) export(batch []*StandardSpan) {
 			}
 
 			// Ensure the backup directory exists
-			if err := os.MkdirAll(p.options.BackupDir, 0755); err != nil {
+			if err := os.MkdirAll(p.options.BackupDir, 0750); err != nil {
 				logger.Error("Failed to create backup directory: %v", err)
 				return
 			}
 
 			// Write to file
-			if err := os.WriteFile(batchBackupFile, jsonData, 0644); err != nil {
+			if err := os.WriteFile(batchBackupFile, jsonData, 0600); err != nil {
 				logger.Error("Failed to write batch backup file: %v", err)
-				return
+			} else {
+				logger.Info("Saved batch to backup file: %s", batchBackupFile)
 			}
-
-			logger.Info("Saved batch of %d spans to backup file: %s", len(batch), batchBackupFile)
 		}
 	} else {
 		logger.Info("Successfully exported %d spans", len(batch))

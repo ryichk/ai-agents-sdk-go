@@ -258,8 +258,7 @@ func (s *OpenAIStream) Recv() (*StreamChunk, error) {
 }
 
 func (s *OpenAIStream) Close() error {
-	s.stream.Close()
-	return nil
+	return s.stream.Close()
 }
 
 func mapToOpenAITool(toolMap map[string]any) (openai.Tool, error) {

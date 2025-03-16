@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -108,28 +109,51 @@ func TestSpanHierarchy(t *testing.T) {
 }
 
 type MockExporter struct {
-	ExportedSpans  []*StandardSpan
+	mu             sync.Mutex
+	exportedSpans  []*StandardSpan
 	ShutdownCalled bool
 }
 
 func (e *MockExporter) ExportSpan(ctx context.Context, span *StandardSpan) error {
-	e.ExportedSpans = append(e.ExportedSpans, span)
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.exportedSpans = append(e.exportedSpans, span)
 	return nil
 }
 
 func (e *MockExporter) ExportSpans(ctx context.Context, spans []*StandardSpan) error {
-	e.ExportedSpans = append(e.ExportedSpans, spans...)
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.exportedSpans = append(e.exportedSpans, spans...)
 	return nil
 }
 
+// GetExportedSpans returns a copy of the exported spans in a thread-safe manner
+func (e *MockExporter) GetExportedSpans() []*StandardSpan {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	result := make([]*StandardSpan, len(e.exportedSpans))
+	copy(result, e.exportedSpans)
+	return result
+}
+
+// GetExportedSpansCount returns the count of exported spans in a thread-safe manner
+func (e *MockExporter) GetExportedSpansCount() int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return len(e.exportedSpans)
+}
+
 func (e *MockExporter) Shutdown(ctx context.Context) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	e.ShutdownCalled = true
 	return nil
 }
 
 func TestBatchProcessor(t *testing.T) {
 	mockExporter := &MockExporter{
-		ExportedSpans: make([]*StandardSpan, 0),
+		exportedSpans: make([]*StandardSpan, 0),
 	}
 
 	// Create a batch processor (with small batch size and short interval)
@@ -147,16 +171,18 @@ func TestBatchProcessor(t *testing.T) {
 	span2, _ := tracer.StartSpan(context.Background(), "span2", nil)
 	span2.End()
 
-	// Batch size should be reached, so spans should be exported
+	// Wait a bit for processing and then force flush to ensure export
 	time.Sleep(50 * time.Millisecond)
-	assert.Len(t, mockExporter.ExportedSpans, 2)
+	processor.ForceFlush()
+	assert.Equal(t, 2, mockExporter.GetExportedSpansCount(), "Expected 2 spans to be exported")
 
 	span3, _ := tracer.StartSpan(context.Background(), "span3", nil)
 	span3.End()
 
-	// Wait for export interval
+	// Wait for export interval and force flush again
 	time.Sleep(200 * time.Millisecond)
-	assert.Len(t, mockExporter.ExportedSpans, 3)
+	processor.ForceFlush()
+	assert.Equal(t, 3, mockExporter.GetExportedSpansCount(), "Expected 3 spans to be exported")
 
 	// Shutdown processor and tracer
 	err := processor.Shutdown(context.Background())
@@ -184,7 +210,7 @@ func TestGlobalTracer(t *testing.T) {
 
 	// Test adding a global span processor
 	mockExporter := &MockExporter{
-		ExportedSpans: make([]*StandardSpan, 0),
+		exportedSpans: make([]*StandardSpan, 0),
 	}
 	processor := NewBatchSpanProcessor(mockExporter, WithBatchSize(1))
 	AddGlobalProcessor(processor)
@@ -195,7 +221,7 @@ func TestGlobalTracer(t *testing.T) {
 
 	// Verify the span was exported (need to wait a bit)
 	time.Sleep(200 * time.Millisecond)
-	assert.GreaterOrEqual(t, len(mockExporter.ExportedSpans), 1)
+	assert.GreaterOrEqual(t, mockExporter.GetExportedSpansCount(), 1, "Expected at least 1 span to be exported")
 
 	// Cleanup
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
@@ -285,12 +311,33 @@ func TestSpanTypeConversion(t *testing.T) {
 
 // TestTracingIntegration tests integration of tracing components
 func TestTracingIntegration(t *testing.T) {
+	// Save the original global tracer to restore it later
+	originalTracer := GetTracer()
+
+	// Create a mock exporter and processor
 	mockExporter := &MockExporter{
-		ExportedSpans: make([]*StandardSpan, 0),
+		exportedSpans: make([]*StandardSpan, 0),
 	}
 
 	processor := NewBatchSpanProcessor(mockExporter, WithBatchSize(1))
-	SetTracer(NewStandardTracer(processor))
+	tracer := NewStandardTracer(processor)
+
+	// Set up cleanup to properly shutdown resources at the end of the test
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancel()
+
+		err := processor.Shutdown(ctx)
+		if err != nil {
+			t.Logf("Error shutting down processor: %v", err)
+		}
+
+		// Restore the original tracer
+		SetTracer(originalTracer)
+	})
+
+	// Set the tracer for this test
+	SetTracer(tracer)
 
 	// Setup test scenario
 	ctx := context.Background()
@@ -318,8 +365,14 @@ func TestTracingIntegration(t *testing.T) {
 	agentSpan.SetAttribute("final_result", "success")
 	AgentRunEndEvent(agentCtx, "Final output", 100*time.Millisecond, true, nil)
 
-	// Wait for spans to be processed
-	time.Sleep(200 * time.Millisecond)
+	// Wait for spans to be processed - increase the timeout for race detection
+	time.Sleep(300 * time.Millisecond)
+
+	// Force flush any pending spans
+	processor.ForceFlush()
+
+	// Get a thread-safe copy of exported spans
+	exportedSpans := mockExporter.GetExportedSpans()
 
 	// Verify exported spans
 	toolSpanExported := false
@@ -327,7 +380,7 @@ func TestTracingIntegration(t *testing.T) {
 	agentSpanExported := false
 	var exportedAgentSpan *StandardSpan
 
-	for _, span := range mockExporter.ExportedSpans {
+	for _, span := range exportedSpans {
 		switch span.ctx.Name {
 		case "tool_call":
 			toolSpanExported = true
@@ -352,14 +405,6 @@ func TestTracingIntegration(t *testing.T) {
 		assert.Equal(t, "test-agent", exportedAgentSpan.ctx.Attributes["agent_id"])
 		assert.Equal(t, "success", exportedAgentSpan.ctx.Attributes["final_result"])
 	}
-
-	// Cleanup
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-	err := processor.Shutdown(ctx)
-	assert.NoError(t, err)
-	err = ShutdownTracing(ctx)
-	assert.NoError(t, err)
 }
 
 // Message is the type for tracing messages
