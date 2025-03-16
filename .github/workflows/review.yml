@@ -1,0 +1,61 @@
+name: PR Review
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [opened, synchronize, reopened]
+
+jobs:
+  review:
+    name: Automated PR Review
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+        cache: true
+
+    - name: Check code formatting
+      run: |
+        if [ -n "$(gofmt -l .)" ]; then
+          echo "The following files need to be formatted with gofmt:"
+          gofmt -l .
+          exit 1
+        fi
+
+    - name: Verify dependencies
+      run: go mod verify
+
+    - name: Check if there are any changes in go.mod and go.sum files
+      id: verify-go-mod
+      run: |
+        if [[ $(git diff --name-only origin/main HEAD -- go.mod go.sum | wc -l) -gt 0 ]]; then
+          echo "Changes detected in go.mod or go.sum"
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+        else
+          echo "No changes in go.mod or go.sum"
+          echo "has_changes=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Run go mod tidy if there are changes
+      if: steps.verify-go-mod.outputs.has_changes == 'true'
+      run: |
+        go mod tidy
+        if [[ $(git diff --name-only go.mod go.sum | wc -l) -gt 0 ]]; then
+          echo "go.mod or go.sum needs to be updated"
+          echo "Run 'go mod tidy' locally and commit the changes"
+          exit 1
+        fi
+
+    - name: golangci-lint comment
+      uses: golangci/golangci-lint-action@v4
+      with:
+        version: latest
+        args: --timeout=5m
+        only-new-issues: true

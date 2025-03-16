@@ -1,0 +1,34 @@
+name: Watch OpenAI Agents SDK
+
+on:
+  schedule:
+    - cron: '0 0 * * 5'  # Run at 00:00 on Friday
+
+jobs:
+  check-updates:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Check OpenAI Agents SDK updates
+        run: |
+          # OpenAIのリポジトリの最新コミットを取得
+          LATEST_COMMIT=$(curl -s https://api.github.com/repos/openai/openai-agents-python/commits/main | jq -r .sha)
+
+          # 前回のコミットハッシュと比較
+          if [ "$LATEST_COMMIT" != "$(cat .openai-agents-commit)" ]; then
+            echo "New changes detected in OpenAI Agents SDK"
+            echo $LATEST_COMMIT > .openai-agents-commit
+
+            # 変更内容を解析
+            CHANGES=$(curl -s https://api.github.com/repos/openai/openai-agents-python/compare/$(cat .openai-agents-commit)...$LATEST_COMMIT)
+
+            # 変更を通知
+            echo "Changes detected:"
+            echo $CHANGES | jq -r '.commits[].commit.message'
+
+            # イシューを作成
+            gh issue create --title "OpenAI Agents SDK Update" --body "New changes detected in OpenAI Agents SDK. Please review and update our implementation."
+          fi

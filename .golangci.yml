@@ -1,0 +1,60 @@
+# golangci-lint設定ファイル
+# 詳細: https://golangci-lint.run/usage/configuration/
+
+run:
+  # タイムアウト設定: デフォルトは1分
+  timeout: 5m
+
+  # テストファイルを解析するかどうか
+  tests: true
+
+# すべての問題を出力（デフォルトは最大10件まで）
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+  # 特定のディレクトリやファイルを除外
+  exclude-rules:
+    - path: .github
+      linters:
+        - all
+    - path: examples
+      linters:
+        - all
+
+# 使用するリンターを指定
+linters:
+  enable:
+    - errcheck      # エラーハンドリングの確認
+    - gosimple      # コードの簡素化提案
+    - govet         # 疑わしいコード構造を検出
+    - ineffassign   # 未使用の代入を検出
+    - staticcheck   # 様々な静的分析
+    - typecheck     # 型チェック
+    - unused        # 未使用のコードを検出
+    - gocyclo       # 循環的複雑性をチェック
+    - gofmt         # gofmtでフォーマット確認
+    - goimports     # goimportsでインポート整理確認
+    - misspell      # スペルミスを検出
+    - revive        # 高度なコードスタイルチェッカー
+    - unconvert     # 不要な型変換を検出
+    - prealloc      # スライスの事前割り当て最適化提案
+
+  disable:
+    - lll           # 行の長さ制限を無効化
+
+# リンター固有の設定
+linters-settings:
+  gocyclo:
+    # 関数の循環的複雑性の制限
+    min-complexity: 20
+
+  revive:
+    # エクスポートされた関数/メソッドのコメント確認
+    rules:
+      - name: exported
+        severity: warning
+        disabled: false
+
+  misspell:
+    locale: US

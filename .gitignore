@@ -1,0 +1,68 @@
+# Go言語関連
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+
+# バイナリ
+bin/
+dist/
+
+# ビルドキャッシュ
+/_tmp/
+
+# 依存関係
+/vendor/
+
+# IDE/エディタ関連
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# 環境変数/シークレット
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ログファイル
+*.log
+
+# トレース出力
+traces/
+
+# キャッシュファイル
+.cache/
+
+# カバレッジファイル
+coverage.txt
+coverage.html
+
+# ドキュメント生成
+/docs/generated/
+
+# テスト結果
+/test-results/
+
+# macOS関連
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows関連
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
