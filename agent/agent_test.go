@@ -242,23 +242,23 @@ func TestCompleteAgent(t *testing.T) {
 func TestCloneAgent(t *testing.T) {
 	originalAgent := New("Original Agent", "Original instructions")
 	originalAgent.SetModel("gpt-4o")
-	originalAgent.HandoffDesc = "Original handoff description"
+	originalAgent.HandoffDescription = "Original handoff description"
 
 	clonedAgent := originalAgent.Clone()
 
 	assert.Equal(t, originalAgent.Name, clonedAgent.Name, "Name should be copied")
 	assert.Equal(t, originalAgent.Instructions, clonedAgent.Instructions, "Instructions should be copied")
 	assert.Equal(t, originalAgent.Model, clonedAgent.Model, "Model should be copied")
-	assert.Equal(t, originalAgent.HandoffDesc, clonedAgent.HandoffDesc, "Handoff description should be copied")
+	assert.Equal(t, originalAgent.HandoffDescription, clonedAgent.HandoffDescription, "Handoff description should be copied")
 
 	clonedAgent.SetModel("gpt-4-turbo")
-	clonedAgent.HandoffDesc = "New handoff description"
+	clonedAgent.HandoffDescription = "New handoff description"
 
 	assert.Equal(t, "gpt-4o", originalAgent.Model, "Original agent's model should not be changed")
-	assert.Equal(t, "Original handoff description", originalAgent.HandoffDesc, "Original agent's handoff description should not be changed")
+	assert.Equal(t, "Original handoff description", originalAgent.HandoffDescription, "Original agent's handoff description should not be changed")
 
 	assert.Equal(t, "gpt-4-turbo", clonedAgent.Model, "Cloned agent's model should be changed")
-	assert.Equal(t, "New handoff description", clonedAgent.HandoffDesc, "Cloned agent's handoff description should be changed")
+	assert.Equal(t, "New handoff description", clonedAgent.HandoffDescription, "Cloned agent's handoff description should be changed")
 }
 
 func TestDynamicInstructions(t *testing.T) {
