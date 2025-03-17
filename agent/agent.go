@@ -140,27 +140,3 @@ func (a *Agent) GetInstructions(ctx context.Context) (string, error) {
 	}
 	return a.Instructions, nil
 }
-
-// Make a copy of the agent, with the given arguments changed.
-func (a *Agent) Clone() *Agent {
-	cloned := &Agent{
-		Name:               a.Name,
-		Instructions:       a.Instructions,
-		HandoffDescription: a.HandoffDescription,
-		Model:              a.Model,
-		ModelSettings:      a.ModelSettings,
-		Tools:              make([]tool.Tool, len(a.Tools)),
-		Handoffs:           make([]handoff.Handoff, len(a.Handoffs)),
-		InputGuardrails:    make([]guardrail.InputGuardrail, len(a.InputGuardrails)),
-		OutputGuardrails:   make([]guardrail.OutputGuardrail, len(a.OutputGuardrails)),
-		OutputType:         a.OutputType,
-		Hooks:              a.Hooks,
-	}
-
-	copy(cloned.Tools, a.Tools)
-	copy(cloned.Handoffs, a.Handoffs)
-	copy(cloned.InputGuardrails, a.InputGuardrails)
-	copy(cloned.OutputGuardrails, a.OutputGuardrails)
-
-	return cloned
-}
