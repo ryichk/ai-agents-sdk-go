@@ -14,7 +14,7 @@ import (
 
 type AgentInterface interface {
 	GetName() string
-	GetInstructions() string
+	GetSystemPrompt(ctx context.Context) (string, error)
 }
 
 type AgentHooksInterface interface {

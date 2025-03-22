@@ -329,7 +329,7 @@ func runSingleTurn(state *executionState) (*stepResult, error) {
 	}()
 
 	// Get system prompt
-	instructions, err := state.currentAgent.GetInstructions(stepCtx)
+	instructions, err := state.currentAgent.GetSystemPrompt(stepCtx)
 	if err != nil {
 		stepSpan.SetAttribute("error", err.Error())
 		return nil, fmt.Errorf("failed to get instructions: %w", err)
@@ -662,7 +662,7 @@ func applyHandoffInputFilter(ctx context.Context, state *executionState, stepRes
 // updateMessagesForNewAgent updates the messages with the new agent's instructions
 func updateMessagesForNewAgent(ctx context.Context, state *executionState, stepResult *stepResult) error {
 	// Update messages (replace system message with new agent's)
-	newInstructions, err := stepResult.nextAgent.GetInstructions(ctx)
+	newInstructions, err := stepResult.nextAgent.GetSystemPrompt(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get instructions for next agent: %w", err)
 	}

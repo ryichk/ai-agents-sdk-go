@@ -45,7 +45,7 @@ func TestDynamicInstructions(t *testing.T) {
 
 	ctx := context.Background()
 
-	instructions, err := dynamicAgent.GetInstructions(ctx)
+	instructions, err := dynamicAgent.GetSystemPrompt(ctx)
 	assert.NoError(t, err, "Getting dynamic instructions should not error")
 	assert.Equal(t, "Dynamic instructions", instructions, "Dynamic instructions should match")
 
@@ -54,7 +54,7 @@ func TestDynamicInstructions(t *testing.T) {
 		return "Async dynamic instructions", nil
 	})
 
-	asyncInstructions, err := asyncAgent.GetInstructions(ctx)
+	asyncInstructions, err := asyncAgent.GetSystemPrompt(ctx)
 	assert.NoError(t, err, "Getting async dynamic instructions should not error")
 	assert.Equal(t, "Async dynamic instructions", asyncInstructions, "Async dynamic instructions should match")
 }

@@ -36,6 +36,10 @@ type Agent struct {
 
 	// The instructions for the agent. Will be used as the "system prompt" when this agent is invoked.
 	// Describes what the agent should do, and how it responds.
+	//
+	// Note: In the Python SDK, this field can directly hold either a string or a callable function.
+	// In Go, due to static typing constraints, we use separate fields (dynamicInstructions and
+	// asyncDynamicInstructions) to handle dynamic instruction generation.
 	Instructions string
 
 	// A description of the agent.
@@ -72,9 +76,13 @@ type Agent struct {
 	Hooks Hooks
 
 	// dynamicInstructions is a function that generates dynamic instructions
+	// This is part of the Go implementation's approach to handle callable instructions
+	// that are synchronous (non-async) in the Python SDK.
 	dynamicInstructions InstructionsFunc
 
 	// asyncDynamicInstructions is a function that generates dynamic instructions asynchronously
+	// This is part of the Go implementation's approach to handle coroutine functions
+	// (async def) for instructions in the Python SDK.
 	asyncDynamicInstructions AsyncInstructionsFunc
 }
 
@@ -124,23 +132,18 @@ func (a *Agent) SetHooks(hooks Hooks) {
 	a.Hooks = hooks
 }
 
+// SetDynamicInstructions sets a function to dynamically generate instructions
+// In the Python SDK, this functionality is achieved by directly assigning
+// a callable to the instructions field.
 func (a *Agent) SetDynamicInstructions(f InstructionsFunc) {
 	a.dynamicInstructions = f
 }
 
+// SetAsyncDynamicInstructions sets an async function to dynamically generate instructions
+// In the Python SDK, this functionality is achieved by directly assigning
+// an async callable (coroutine function) to the instructions field.
 func (a *Agent) SetAsyncDynamicInstructions(f AsyncInstructionsFunc) {
 	a.asyncDynamicInstructions = f
-}
-
-// GetInstructions returns the current instructions
-func (a *Agent) GetInstructions(ctx context.Context) (string, error) {
-	if a.asyncDynamicInstructions != nil {
-		return a.asyncDynamicInstructions(ctx)
-	}
-	if a.dynamicInstructions != nil {
-		return a.dynamicInstructions(ctx), nil
-	}
-	return a.Instructions, nil
 }
 
 // GetName returns the agent name
@@ -177,4 +180,18 @@ func (a *Agent) AsTool(runner any, options ...tool.AgentToolOption) (tool.Tool, 
 	}
 
 	return tool.NewAgentTool(a, runnerIF, options...)
+}
+
+// GetSystemPrompt returns the current system prompt (instructions)
+// This is equivalent to the `get_system_prompt` method in the Python SDK.
+// While the Python version can inspect the type of instructions at runtime,
+// the Go version uses predefined fields for different types of instruction sources.
+func (a *Agent) GetSystemPrompt(ctx context.Context) (string, error) {
+	if a.asyncDynamicInstructions != nil {
+		return a.asyncDynamicInstructions(ctx)
+	}
+	if a.dynamicInstructions != nil {
+		return a.dynamicInstructions(ctx), nil
+	}
+	return a.Instructions, nil
 }
