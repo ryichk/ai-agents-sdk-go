@@ -11,7 +11,6 @@ import (
 	"github.com/ryichk/ai-agents-sdk-go/handoff"
 	"github.com/ryichk/ai-agents-sdk-go/model"
 	"github.com/ryichk/ai-agents-sdk-go/tool"
-
 )
 
 type CloneOption func(*Agent)

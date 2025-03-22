@@ -6,10 +6,12 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	"github.com/ryichk/ai-agents-sdk-go/guardrail"
 	"github.com/ryichk/ai-agents-sdk-go/handoff"
+	"github.com/ryichk/ai-agents-sdk-go/interfaces"
 	"github.com/ryichk/ai-agents-sdk-go/model"
 	"github.com/ryichk/ai-agents-sdk-go/tool"
 )
@@ -139,4 +141,40 @@ func (a *Agent) GetInstructions(ctx context.Context) (string, error) {
 		return a.dynamicInstructions(ctx), nil
 	}
 	return a.Instructions, nil
+}
+
+// GetName returns the agent name
+// Implements interfaces.Agent interface
+func (a *Agent) GetName() string {
+	return a.Name
+}
+
+// GetDescription returns the agent description
+// Implements interfaces.Agent interface
+func (a *Agent) GetDescription() string {
+	if a.HandoffDescription != "" {
+		return a.HandoffDescription
+	}
+	return fmt.Sprintf("Agent %s", a.Name)
+}
+
+// AsTool converts this agent to a tool that can be used by other agents.
+//
+// This is different from a handoff in two ways:
+//  1. In handoffs, the new agent receives the conversation history.
+//     In this tool, the new agent receives generated input.
+//  2. In handoffs, the new agent takes over the conversation.
+//     In this tool, the new agent is called as a tool, and the conversation is continued by the original agent.
+func (a *Agent) AsTool(runner any, options ...tool.AgentToolOption) (tool.Tool, error) {
+	if runner == nil {
+		return nil, fmt.Errorf("runner cannot be nil")
+	}
+
+	// Check if runner implements the Runner interface
+	runnerIF, ok := runner.(interfaces.Runner)
+	if !ok {
+		return nil, fmt.Errorf("runner must implement interfaces.Runner interface")
+	}
+
+	return tool.NewAgentTool(a, runnerIF, options...)
 }

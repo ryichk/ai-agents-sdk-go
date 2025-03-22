@@ -5,18 +5,25 @@
 package tool
 
 // NewFunctionToolFromFunc wraps a Go function to be used as an agent tool.
-// In its simplest form, you just pass the function you want to wrap.
 //
-// Example:
-// ```go
+// This is a simplified version of NewFunctionTool that takes just a function and a description.
+// It automatically extracts the function name for use as the tool name.
 //
-//	func getWeather(city string) string {
-//		return fmt.Sprintf("The weather in %s is sunny.", city)
+// Example usage:
+//
+//	func getWeather(city string) (string, error) {
+//		return "Weather information for " + city, nil
 //	}
 //
-// weatherTool := NewFunctionToolFromFunc(getWeather, "Gets weather information for a city")
-// agent.AddTool(weatherTool)
-// ```
+//	weatherTool, err := NewFunctionToolFromFunc(getWeather, "Gets weather information for a city")
+//
+// Args:
+//   - fn: The Go function to wrap as a tool
+//   - description: A description of what the tool does
+//
+// Returns:
+//   - A Tool that wraps the provided function
+//   - An error if the function cannot be converted to a tool
 func NewFunctionToolFromFunc(fn any, description string) (Tool, error) {
 	return NewFunctionTool(fn, FunctionToolOption{
 		DescriptionOverride: description,
@@ -24,6 +31,26 @@ func NewFunctionToolFromFunc(fn any, description string) (Tool, error) {
 }
 
 // NewFunctionToolWithName wraps a function and sets a custom name and description.
+//
+// This function allows creating a tool with both a custom name and description,
+// which is useful when the function name doesn't match the desired tool name.
+//
+// Example usage:
+//
+//	weatherTool, err := NewFunctionToolWithName(
+//		getWeatherData,
+//		"get_weather",
+//		"Gets current weather information for the specified city"
+//	)
+//
+// Args:
+//   - fn: The Go function to wrap as a tool
+//   - name: A custom name for the tool (overrides the function name)
+//   - description: A description of what the tool does
+//
+// Returns:
+//   - A Tool that wraps the provided function
+//   - An error if the function cannot be converted to a tool
 func NewFunctionToolWithName(fn any, name string, description string) (Tool, error) {
 	return NewFunctionTool(fn, FunctionToolOption{
 		NameOverride:        name,

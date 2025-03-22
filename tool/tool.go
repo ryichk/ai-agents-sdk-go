@@ -148,13 +148,48 @@ func convertValue(value any, targetType reflect.Type) (reflect.Value, error) {
 	return reflect.Value{}, fmt.Errorf("cannot convert %v to %v", reflectedValue.Type(), targetType)
 }
 
-// FunctionTool options
+// FunctionToolOption represents options for creating a function tool.
+// These options allow customizing the behavior and metadata of the tool.
 type FunctionToolOption struct {
-	NameOverride        string
+	// NameOverride allows specifying a custom name for the tool instead of using the function name.
+	// This is useful for providing a more descriptive or standardized name for the tool.
+	NameOverride string
+
+	// DescriptionOverride allows providing a custom description for the tool.
+	// The description explains what the tool does and helps the LLM understand when to use it.
 	DescriptionOverride string
 }
 
-// Create a new tool from FunctionTool
+// NewFunctionTool creates a new tool from a function.
+//
+// This function allows converting any Go function into a tool that can be used by agents.
+// By default, it will:
+// 1. Extract the function name to use as the tool's name
+// 2. Generate a JSON schema for the tool's parameters based on function signature
+// 3. Use the provided description or a default one for the tool
+//
+// The function parameters will be automatically converted to corresponding JSON schema types.
+// If the function has a context.Context parameter, it will be automatically populated during execution.
+// The function should return a value that can be marshaled to JSON.
+//
+// Example usage:
+//
+//	func getWeather(city string) (string, error) {
+//		// Implementation
+//		return "Weather data for " + city, nil
+//	}
+//
+//	weatherTool, err := NewFunctionTool(getWeather, FunctionToolOption{
+//		DescriptionOverride: "Get weather information for the specified city",
+//	})
+//
+// Args:
+//   - function: The Go function to wrap as a tool
+//   - options: Optional settings to customize the tool's name and description
+//
+// Returns:
+//   - A FunctionTool that wraps the provided function
+//   - An error if the function cannot be converted to a tool
 func NewFunctionTool(function any, options ...FunctionToolOption) (*FunctionTool, error) {
 	// Get function reflection info
 	reflectedFunc := reflect.ValueOf(function)
