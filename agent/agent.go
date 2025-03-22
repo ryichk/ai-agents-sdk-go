@@ -6,10 +6,12 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	"github.com/ryichk/ai-agents-sdk-go/guardrail"
 	"github.com/ryichk/ai-agents-sdk-go/handoff"
+	"github.com/ryichk/ai-agents-sdk-go/interfaces"
 	"github.com/ryichk/ai-agents-sdk-go/model"
 	"github.com/ryichk/ai-agents-sdk-go/tool"
 )
@@ -20,38 +22,67 @@ type InstructionsFunc func(ctx context.Context) string
 // AsyncInstructionsFunc is a function type that generates dynamic instructions asynchronously
 type AsyncInstructionsFunc func(ctx context.Context) (string, error)
 
-// Agent represents an AI model configured with instructions, tools, guardrails, and handoffs
+// An agent is an AI model configured with instructions, tools, guardrails, and handoffs and more.
+//
+// We strongly recommend passing `instructions`, which is the "system prompt" for the agent.
+// In addition, you can pass `description`, which is a human-readable description of the agent, used
+// when the agent is used inside tools/handoffs.
+//
+// Agents are generic on the context type. The context is a (mutable) object you create.
+// It is passed to tool functions, handoffs, guardrails, etc.
 type Agent struct {
+	// The name of the agent.
 	Name string
 
-	// Instructions are used as a "system prompt" when the agent is called
+	// The instructions for the agent. Will be used as the "system prompt" when this agent is invoked.
+	// Describes what the agent should do, and how it responds.
+	//
+	// Note: In the Python SDK, this field can directly hold either a string or a callable function.
+	// In Go, due to static typing constraints, we use separate fields (dynamicInstructions and
+	// asyncDynamicInstructions) to handle dynamic instruction generation.
 	Instructions string
 
-	// HandoffDesc is the description used when this agent is handed off from another agent
-	HandoffDesc string
+	// A description of the agent.
+	// This is used when the agent is used as a handoff, so that an LLM knows what it does and when to invoke it.
+	HandoffDescription string
 
+	// Handoffs are sub-agents that the agent can delegate to.
+	// You can provide a list of handoffs, and the agent can choose to delegate to them if relevant.
+	// Allows for separation of concerns and modularity.
 	Handoffs []handoff.Handoff
 
-	// Model is the name of the model used by this agent
+	// The Model implementation to use when invoking the LLM.
+	// By default, if not set, the agent will use the default model configured in `runner.DefaultRunConfig`.
 	Model string
 
+	// Configures model-specific tuning parameters (e.g. Temperature, TopP).
 	ModelSettings model.Settings
 
+	// A list of tools that the agent can use.
 	Tools []tool.Tool
 
+	// A list of checks than run in parallel to the agent's execution, before generating a response.
+	// Runs only if the agent is the first agent in the chain.
 	InputGuardrails []guardrail.InputGuardrail
 
+	// A list of checks that run on the final output of the agent, after generating a response.
+	// Runs only if the agent produces a final output.
 	OutputGuardrails []guardrail.OutputGuardrail
 
+	// The type of the output object. If not provided, the output will be `string`.
 	OutputType reflect.Type
 
-	// Hooks handle lifecycle events of the agent
+	// A interface that receives callbacks on various lifecycle events for this agent.
 	Hooks Hooks
 
 	// dynamicInstructions is a function that generates dynamic instructions
+	// This is part of the Go implementation's approach to handle callable instructions
+	// that are synchronous (non-async) in the Python SDK.
 	dynamicInstructions InstructionsFunc
 
 	// asyncDynamicInstructions is a function that generates dynamic instructions asynchronously
+	// This is part of the Go implementation's approach to handle coroutine functions
+	// (async def) for instructions in the Python SDK.
 	asyncDynamicInstructions AsyncInstructionsFunc
 }
 
@@ -101,16 +132,61 @@ func (a *Agent) SetHooks(hooks Hooks) {
 	a.Hooks = hooks
 }
 
+// SetDynamicInstructions sets a function to dynamically generate instructions
+// In the Python SDK, this functionality is achieved by directly assigning
+// a callable to the instructions field.
 func (a *Agent) SetDynamicInstructions(f InstructionsFunc) {
 	a.dynamicInstructions = f
 }
 
+// SetAsyncDynamicInstructions sets an async function to dynamically generate instructions
+// In the Python SDK, this functionality is achieved by directly assigning
+// an async callable (coroutine function) to the instructions field.
 func (a *Agent) SetAsyncDynamicInstructions(f AsyncInstructionsFunc) {
 	a.asyncDynamicInstructions = f
 }
 
-// GetInstructions returns the current instructions
-func (a *Agent) GetInstructions(ctx context.Context) (string, error) {
+// GetName returns the agent name
+// Implements interfaces.Agent interface
+func (a *Agent) GetName() string {
+	return a.Name
+}
+
+// GetDescription returns the agent description
+// Implements interfaces.Agent interface
+func (a *Agent) GetDescription() string {
+	if a.HandoffDescription != "" {
+		return a.HandoffDescription
+	}
+	return fmt.Sprintf("Agent %s", a.Name)
+}
+
+// AsTool converts this agent to a tool that can be used by other agents.
+//
+// This is different from a handoff in two ways:
+//  1. In handoffs, the new agent receives the conversation history.
+//     In this tool, the new agent receives generated input.
+//  2. In handoffs, the new agent takes over the conversation.
+//     In this tool, the new agent is called as a tool, and the conversation is continued by the original agent.
+func (a *Agent) AsTool(runner any, options ...tool.AgentToolOption) (tool.Tool, error) {
+	if runner == nil {
+		return nil, fmt.Errorf("runner cannot be nil")
+	}
+
+	// Check if runner implements the Runner interface
+	runnerIF, ok := runner.(interfaces.Runner)
+	if !ok {
+		return nil, fmt.Errorf("runner must implement interfaces.Runner interface")
+	}
+
+	return tool.NewAgentTool(a, runnerIF, options...)
+}
+
+// GetSystemPrompt returns the current system prompt (instructions)
+// This is equivalent to the `get_system_prompt` method in the Python SDK.
+// While the Python version can inspect the type of instructions at runtime,
+// the Go version uses predefined fields for different types of instruction sources.
+func (a *Agent) GetSystemPrompt(ctx context.Context) (string, error) {
 	if a.asyncDynamicInstructions != nil {
 		return a.asyncDynamicInstructions(ctx)
 	}
@@ -118,28 +194,4 @@ func (a *Agent) GetInstructions(ctx context.Context) (string, error) {
 		return a.dynamicInstructions(ctx), nil
 	}
 	return a.Instructions, nil
-}
-
-// Clone creates a new copy of the agent
-func (a *Agent) Clone() *Agent {
-	cloned := &Agent{
-		Name:             a.Name,
-		Instructions:     a.Instructions,
-		HandoffDesc:      a.HandoffDesc,
-		Model:            a.Model,
-		ModelSettings:    a.ModelSettings,
-		Tools:            make([]tool.Tool, len(a.Tools)),
-		Handoffs:         make([]handoff.Handoff, len(a.Handoffs)),
-		InputGuardrails:  make([]guardrail.InputGuardrail, len(a.InputGuardrails)),
-		OutputGuardrails: make([]guardrail.OutputGuardrail, len(a.OutputGuardrails)),
-		OutputType:       a.OutputType,
-		Hooks:            a.Hooks,
-	}
-
-	copy(cloned.Tools, a.Tools)
-	copy(cloned.Handoffs, a.Handoffs)
-	copy(cloned.InputGuardrails, a.InputGuardrails)
-	copy(cloned.OutputGuardrails, a.OutputGuardrails)
-
-	return cloned
 }
