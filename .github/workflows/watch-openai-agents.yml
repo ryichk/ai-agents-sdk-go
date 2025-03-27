@@ -23,15 +23,40 @@ jobs:
           # 前回のコミットハッシュと比較
           if [ "$LATEST_COMMIT" != "$(cat .openai-agents-commit)" ]; then
             echo "New changes detected in OpenAI Agents SDK"
+
+            # 前回のコミットハッシュを取得
+            PREVIOUS_COMMIT=$(cat .openai-agents-commit || echo "")
+
+            # 新しいコミットハッシュを保存
             echo $LATEST_COMMIT > .openai-agents-commit
 
             # 変更内容を解析
-            CHANGES=$(curl -s https://api.github.com/repos/openai/openai-agents-python/compare/$(cat .openai-agents-commit)...$LATEST_COMMIT)
+            CHANGES=$(curl -s https://api.github.com/repos/openai/openai-agents-python/compare/${PREVIOUS_COMMIT}...$LATEST_COMMIT)
 
             # 変更を通知
             echo "Changes detected:"
-            echo $CHANGES | jq -r '.commits[].commit.message'
+            COMMITS_INFO=$(echo "$CHANGES" | jq -r '.commits[] | "* **" + .commit.author.name + "**: " + .commit.message')
+            echo "$COMMITS_INFO"
+
+            # 変更の詳細を取得
+            CHANGED_FILES=$(echo "$CHANGES" | jq -r '.files | length')
+            ADDITIONS=$(echo "$CHANGES" | jq -r '.stats.additions')
+            DELETIONS=$(echo "$CHANGES" | jq -r '.stats.deletions')
+
+            # イシュー本文を作成
+            ISSUE_BODY="## OpenAI Agents SDK の更新を検出しました
+
+### 変更概要
+- 変更ファイル数: ${CHANGED_FILES}
+- 追加行数: ${ADDITIONS}
+- 削除行数: ${DELETIONS}
+- 比較URL: https://github.com/openai/openai-agents-python/compare/${PREVIOUS_COMMIT}...${LATEST_COMMIT}
+
+### コミット履歴
+${COMMITS_INFO}
+
+実装の更新を検討してください。"
 
             # イシューを作成
-            gh issue create --title "OpenAI Agents SDK Update" --body "New changes detected in OpenAI Agents SDK. Please review and update our implementation."
+            gh issue create --title "OpenAI Agents SDK Update" --body "$ISSUE_BODY"
           fi
