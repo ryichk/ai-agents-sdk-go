@@ -4,6 +4,9 @@ on:
   schedule:
     - cron: '0 0 * * 5'  # Run at 00:00 on Friday
 
+env:
+  GH_TOKEN: ${{ github.token }}
+
 jobs:
   check-updates:
     runs-on: ubuntu-latest
